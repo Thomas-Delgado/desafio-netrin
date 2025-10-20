@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  api:
+    build: 
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+      - PYTHONPATH=/src
+    depends_on:
+      - redis
+      - rabbitmq
+    volumes:
+      - ./src:/src
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      - URL_SINTEGRA=https://appasp.sefaz.go.gov.br/sintegra/consulta/default.html
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+      - PYTHONPATH=/src
+    depends_on:
+      - redis
+      - rabbitmq
+    volumes:
+      - ./src:/src
+
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest

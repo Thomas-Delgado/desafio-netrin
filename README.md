@@ -4,25 +4,6 @@ Este projeto é um **web scraper** para consultar dados de empresas no Sintegra,
 
 ---
 
-## Estrutura do Projeto
-
-desafio_netrin/
-├── docker-compose.yml
-├── Dockerfile.api
-├── Dockerfile.worker
-├── requirements.txt
-├── src/
-│ ├── app/
-│ │ ├── main.py # FastAPI application
-│ │ └── models.py
-│ ├── worker/
-│ │ ├── worker.py # Worker
-│ │ └── scraper.py # Funções de scraping
-│ └── infrastructure/ # Client
-└── tests/
-├── test_api.py
-└── test_scraper.py
-
 ## Requisitos
 
 - Docker >= 20

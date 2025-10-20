@@ -129,20 +129,6 @@ Verifique Consumers = 1 (worker conectado)
 
 Observe a queda do campo Ready quando o worker consome
 
-📁 Estrutura do Projeto
-text
-src/
-├── 🚀 app/
-│   ├── __init__.py
-│   ├── main.py          # FastAPI: /scrape e /results/{task_id}
-│   └── models.py        # Pydantic models e exceptions
-├── 🏗️ infrastructure/
-│   └── clients_manager.py  # RedisClient e RabbitMQClient
-└── 🛠️ worker/
-    ├── __init__.py
-    ├── worker.py        # Loop do consumidor (RabbitMQ → processa → Redis)
-    └── scraper.py       # Playwright: consulta.asp → consultar.asp → parse
-🔧 Como o Worker Funciona
 🔄 Processo Técnico
 📥 Consumo: Conecta no RabbitMQ e consome a fila scraping_queue
 

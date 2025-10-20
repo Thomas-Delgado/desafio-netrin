@@ -19,7 +19,7 @@ def update_task_status(task_id: str, status: str, data: dict = None, error: str 
     redis_client.set_task_status(task_id, status, task_data, error)
     logger.info(f"Task {task_id} -> {status}")
 
-def process_message(body):
+def process_message(ch, method, properties, body):
     """
     Processa uma mensagem da fila
     Recebe: {"task_id": "uuid", "cnpj": "00006486000175"}

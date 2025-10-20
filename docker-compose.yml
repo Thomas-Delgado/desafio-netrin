@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   api:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.api
     ports:
@@ -16,13 +14,14 @@ services:
       - rabbitmq
     volumes:
       - ./src:/src
+    restart: always
 
   worker:
     build:
       context: .
-      dockerfile: Dockerfile.worker
+      dockerfile: Dockerfile.worker   # <- agora é o do Playwright
     environment:
-      - URL_SINTEGRA=https://appasp.sefaz.go.gov.br/sintegra/consulta/default.html
+      - URL_SINTEGRA=https://appasp.sefaz.go.gov.br/Sintegra/Consulta/consulta.asp
       - REDIS_HOST=redis
       - RABBITMQ_HOST=rabbitmq
       - PYTHONPATH=/src
@@ -31,11 +30,12 @@ services:
       - rabbitmq
     volumes:
       - ./src:/src
+    restart: always
 
   redis:
     image: redis:7.2-alpine
-    ports:
-      - "6379:6379"
+    ports: ["6379:6379"]
+    restart: always
 
   rabbitmq:
     image: rabbitmq:3.12-management
@@ -45,3 +45,4 @@ services:
     environment:
       - RABBITMQ_DEFAULT_USER=guest
       - RABBITMQ_DEFAULT_PASS=guest
+    restart: always

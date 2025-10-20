@@ -1,52 +1,72 @@
-import requests
-from bs4 import BeautifulSoup
 import logging
 import os
+from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
-# Configuração de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+FORM_URL = os.getenv(
+    "URL_SINTEGRA"
+)
+
 def scrape_sintegra(cnpj: str) -> dict:
     """
-    Faz scraping do site da Sintegra Goiás.
-    Retorna um dicionário com os data ou um campo 'erro' se houver falha.
-
+    Scraping do Sintegra GO com Playwright (Chromium headless).
+    Fluxo:
+      1) Abre consulta.asp
+      2) Preenche CNPJ e clica "Consultar"
+      3) Aguarda consultar.asp
+      4) Extrai dados com BeautifulSoup
     """
+    logger.info(f"Iniciando scraping Playwright para CNPJ: {cnpj}")
+
     try:
-        logger.info(f"Iniciando scraping REAL para CNPJ: {cnpj}")
-        
-        url = os.environ.get('URL_SINTEGRA')
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Origin': 'https://appasp.sefaz.go.gov.br',
-            'Referer': 'https://appasp.sefaz.go.gov.br/sintegra/consulta/default.html',
-        }
-        form_data = {'num_cnpj': cnpj, 'botao': 'Consultar'}
-        
-        #Manda uma requisição POST para o site da Sintegra com o CNPJ e os headers apropriados
-        response = requests.post(url, data=form_data, headers=headers, timeout=30)
-        if response.status_code != 200:
-            raise Exception(f"Erro {e}.")
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--window-size=1920,1080",
+            ])
+            context = browser.new_context()
+            page = context.new_page()
 
-        soup = BeautifulSoup(response.content, 'html.parser')
+            # 1) Abre o formulário
+            page.goto(FORM_URL, wait_until="domcontentloaded", timeout=30000)
+
+            # 2) Espera o input e preenche
+            page.wait_for_selector('input[name="num_cnpj"]', timeout=15000)
+            page.fill('input[name="num_cnpj"]', cnpj)
+
+            # 3) Clica em "Consultar"
+            # (nome 'botao' é comum nesse formulário)
+            page.click('input[name="botao"]')
+
+            # 4) Aguarda a página de resultado (consultar.asp) ou um seletor estável
+            try:
+                page.wait_for_url(lambda url: "consultar.asp" in url, timeout=20000)
+            except PWTimeout:
+                # fallback: espera algum label típico
+                page.wait_for_selector("span:has-text('Nome Empresarial')", timeout=10000)
+
+            html = page.content()
+            page.close()
+            context.close()
+            browser.close()
+
+        soup = BeautifulSoup(html, "html.parser")
         data = extract_data_sintegra(soup, cnpj)
-
-        logger.info(f"Scraping concluído para {cnpj}.")
+        logger.info(f"Scraping Playwright concluído para {cnpj}")
         return data
-        
-    except requests.exceptions.Timeout:
-        raise Exception("Timeout ao acessar o site da Sintegra.")
+
     except Exception as e:
-        raise Exception(f"Erro no scraping: {str(e)}")
+        logger.error(f"Erro no scraping (Playwright): {e}")
+        raise Exception(f"Erro no scraping (Playwright): {e}")
 
 
 def extract_data_sintegra(soup: BeautifulSoup, cnpj: str) -> dict:
-    """
-    Extrai os data relevantes do HTML retornado pela Sintegra.
-    """
-
+    """Extrai dados principais da página consultar.asp (GO)."""
     data = {
         "cnpj": cnpj,
         "inscricao_estadual": "",
@@ -56,69 +76,46 @@ def extract_data_sintegra(soup: BeautifulSoup, cnpj: str) -> dict:
         "atividade_principal": "",
         "situacao_cadastral": "",
         "regime_apuracao": "",
-        "data_cadastramento": ""
+        "data_cadastramento": "",
+        "erro": ""
     }
 
     try:
-        # Realiza a extração dos campos necessários no HTML
-        # Inscrição Estadual
-        ie_el = soup.find('span', class_='label_title', string='Inscricao Estadual')
-        if ie_el:
-            ie_text = ie_el.find_next_sibling('span', class_='label_text')
-            if ie_text:
-                data['inscricao_estadual'] = ie_text.text.strip()
-        
-        # Nome Empresarial e Fantasia
-        razao_el = soup.find('span', class_='label_title', string='Nome Empresarial')
-        if razao_el:
-            razao_text = razao_el.find_next_sibling('span', class_='label_text')
-            if razao_text:
-                data['razao_social'] = razao_text.text.strip()
-        
-        fantasia_el = soup.find('span', class_='label_title', string='Nome Fantasia')
-        if fantasia_el:
-            fantasia_text = fantasia_el.find_next_sibling('span', class_='label_text')
-            if fantasia_text:
-                data['nome_fantasia'] = fantasia_text.text.strip()
-        
-        # Endereço
-        endereco_el = soup.find('div', class_='label_title', string='Endereco Estabelecimento')
-        if endereco_el:
-            endereco_text = endereco_el.find_next_sibling('span', class_='label_text')
-            if endereco_text:
-                data['endereco'] = endereco_text.text.strip()
-        
-        # Atividade Principal
-        atividade_texts = soup.find_all('span', class_='label_text')
-        for texto in atividade_texts:
-            if ' - ' in texto.text and any(c.isdigit() for c in texto.text.split(' - ')[0]):
-                data['atividade_principal'] = texto.text.strip()
-        
-        # Informações complementares
-        situacao_el = soup.find('span', class_='label_title', string='Situacao Cadastral Vigente:')
-        if situacao_el:
-            situacao_text = situacao_el.find_next_sibling('span', class_='label_text')
-            if situacao_text:
-                data['situacao_cadastral'] = situacao_text.text.strip()
-        
-        regime_el = soup.find('span', class_='label_title', string='Regime de Apuracao:')
-        if regime_el:
-            regime_text = regime_el.find_next_sibling('span', class_='label_text')
-            if regime_text:
-                data['regime_apuracao'] = regime_text.text.strip()
-        
-        data_cad_el = soup.find('span', class_='label_title', string='Data de Cadastramento:')
-        if data_cad_el:
-            data_cad_text = data_cad_el.find_next_sibling('span', class_='label_text')
-            if data_cad_text:
-                data['data_cadastramento'] = data_cad_text.text.strip()
-        
-        # Verifica se CNPJ é inválido
-        texto_pagina = soup.get_text()
-        if 'nao encontrado' in texto_pagina.lower() or 'nao existe' in texto_pagina.lower():
-            data['erro'] = 'CNPJ nao encontrado na base da Sintegra'
-        
+        def get_value(label):
+            el = soup.find("span", string=lambda s: s and label in s)
+            if el:
+                nxt = el.find_next("span")
+                if nxt:
+                    return nxt.get_text(strip=True)
+            return ""
+
+        data["inscricao_estadual"] = get_value("Inscricao Estadual")
+        data["razao_social"] = get_value("Nome Empresarial")
+        data["nome_fantasia"] = get_value("Nome Fantasia")
+        data["situacao_cadastral"] = get_value("Situacao Cadastral Vigente")
+        data["regime_apuracao"] = get_value("Regime de Apuracao")
+        data["data_cadastramento"] = get_value("Data de Cadastramento")
+
+        # Endereço (pode variar o container)
+        end_el = soup.find(lambda tag: tag.name in ("div", "span") and tag.get_text(strip=True).startswith("Endereco"))
+        if end_el:
+            nxt = end_el.find_next("span")
+            if nxt:
+                data["endereco"] = nxt.get_text(strip=True)
+
+        # Atividade principal (heurística simples)
+        for s in soup.find_all("span"):
+            txt = s.get_text(strip=True)
+            if " - " in txt and any(ch.isdigit() for ch in txt.split(" - ")[0]):
+                data["atividade_principal"] = txt
+                break
+
+        # Erro comum
+        texto = soup.get_text(" ", strip=True).lower()
+        if "não encontrado" in texto or "nao encontrado" in texto:
+            data["erro"] = "CNPJ não encontrado na base da Sintegra"
+
     except Exception as e:
-        data['erro'] = f"Falha ao extrair data: {str(e)}"
-    
+        data["erro"] = f"Falha ao extrair dados: {e}"
+
     return data

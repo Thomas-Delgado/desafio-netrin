@@ -92,22 +92,16 @@ Erro
 
 { "task_id":"...", "status":"error", "data":{}, "error":"Mensagem de erro" }
 
-Logs rápidos (útil pro avaliador)
 
-Todos os serviços
 
+Todos os serviços com logs
 docker compose logs -f
 
-
 Só o worker (ver consumo da fila e scraping)
-
 docker compose logs -f worker
 
-
 RabbitMQ (ver se está aceitando conexões)
-
 docker compose logs -f rabbitmq
-
 
 No painel do RabbitMQ (Queues → scraping_queue) verifique Consumers = 1 (worker conectado) e a queda do campo Ready quando o worker consome.
 
@@ -126,39 +120,12 @@ src/
 
 Como o Worker funciona (resumo técnico)
 
-Conecta no RabbitMQ e consome a fila scraping_queue.
-
-Para cada mensagem {task_id, cnpj}:
-
-marca processing no Redis;
-
-abre o Playwright/Chromium (headless), acessa Consulta/consulta.asp, preenche o CNPJ, clica em Consultar, espera consultar.asp;
-
-extrai os campos com BeautifulSoup;
-
-marca completed (ou error) no Redis com os dados.
-
-Adicione seu usuário ao grupo docker:
-
-sudo usermod -aG docker $USER && newgrp docker
-
-Worker não conecta ao RabbitMQ (ConnectionRefused/Consumers=0)
-
-Veja se o RabbitMQ está “Up”:
-
-docker compose ps
-docker compose logs -f rabbitmq
-
-
-Reinicie o worker (às vezes o RabbitMQ leva alguns segundos a mais):
-
-docker compose restart worker
-
-Erro ao puxar imagem Playwright (tag não encontrada)
-
-Use mcr.microsoft.com/playwright/python:v1.47.2-jammy ou mcr.microsoft.com/playwright/python:jammy.
-
-“no such element” no scraping
+-Conecta no RabbitMQ e consome a fila scraping_queue.
+-Para cada mensagem {task_id, cnpj}:
+-marca processing no Redis;
+-abre o Playwright/Chromium (headless), acessa Consulta/consulta.asp, preenche o CNPJ, clica em Consultar, espera consultar.asp;
+-extrai os campos com BeautifulSoup;
+-marca completed (ou error) no Redis com os dados.
 
 O site pode estar lento/diferente. O worker usa esperas explícitas (Playwright wait_for_*).
 Reenvie a tarefa; se persistir, verifique seletor/URL (Consulta/consulta.asp → consultar.asp).

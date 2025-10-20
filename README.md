@@ -1,138 +1,180 @@
-Desafio Netrin — Scraper Sintegra (FastAPI + RabbitMQ + Redis + Worker Playwright)
+🚀 Desafio Netrin — Scraper Sintegra
+Sistema assíncrono para consulta de dados de empresas no Sintegra/GO
 
-Scraper assíncrono para consultar dados de empresas no Sintegra/GO.
-A API enfileira tarefas no RabbitMQ, o worker (Playwright/Chromium, headless) processa e o Redis armazena status/resultado.
+Um scraper robusto que utiliza FastAPI + RabbitMQ + Redis + Worker Playwright para processar consultas de forma assíncrona e eficiente.
 
-Stack
+🏗️ Arquitetura
+text
+📦 Sistema Assíncrono
+├── 🚀 API (FastAPI)
+├── 📨 Fila (RabbitMQ)
+├── 💾 Cache (Redis)
+└── 🛠️ Worker (Playwright)
 
-API: FastAPI (Python 3.11)
+🛠️ Stack Tecnológica
 
-Fila: RabbitMQ (com painel :15672)
-
-Cache/Status: Redis
-
-Worker: Playwright (Chromium headless)
-
-Container: Docker + Docker Compose
-
-Requisitos
-
-Git
-
-Docker 20+
-
-Docker Compose v2+
-
-Como rodar (5 passos)
-1) Clonar o repositório
+API	FastAPI (Python 3.11)
+Fila	RabbitMQ (com painel :15672)
+Cache/Status	Redis
+Worker	Playwright (Chromium headless)
+Container	Docker + Docker Compose
+⚡ Como Rodar (5 passos rápidos)
+1. 📥 Clonar o repositório
+bash
 git clone https://github.com/Thomas-Delgado/desafio-netrin.git
 cd desafio-netrin
-
-2) Subir com Docker
+2. 🐳 Subir com Docker
+bash
 docker compose up -d --build
-
-3) Verificar serviços
+3. ✅ Verificar serviços
+bash
 docker compose ps
+Você deve ver: api, worker, redis, rabbitmq como Up ✅
 
-
-Você deve ver api, worker, redis, rabbitmq como Up.
-
-4) Acessos úteis
-
+4. 🌐 Acessos úteis
 RabbitMQ UI: http://localhost:15672
- (user: guest, pass: guest)
 
-Fluxo (resumo)
-POST /scrape  →  publica job na fila  →  worker consome  →  faz scraping  →  salva status/resultado no Redis
-GET  /results/{task_id}  →  retorna status e dados (se prontos)
+👤 User: guest
 
-Endpoints (com exemplos curl)
-1) Criar tarefa de scraping
+🔑 Pass: guest
+
+5. 🧪 Testar a aplicação
+bash
+# Exemplo de consulta
 curl -X POST http://localhost:8000/scrape \
   -H "Content-Type: application/json" \
   -d '{"cnpj":"00006486000175"}'
+🔄 Fluxo do Sistema
 
 
-Resposta (exemplo)
 
+
+
+POST /scrape → publica job na fila
+
+Worker consome da fila → faz scraping
+
+Redis armazena status/resultado
+
+GET /results/{task_id} → retorna status e dados
+
+📡 Endpoints
+🎯 Criar tarefa de scraping
+bash
+curl -X POST http://localhost:8000/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"cnpj":"00006486000175"}'
+📤 Resposta (exemplo):
+
+json
 {
   "task_id": "8fcb0c4b-1b60-4d38-86bb-938b11e64a33",
   "status": "enqueued",
   "message": "Tarefa de scraping enfileirada com sucesso."
 }
+🔍 Consultar status/resultado
+bash
+curl -X GET http://localhost:8000/results/8fcb0b4b-1b60-4d38-86bb-938b11e64a33
+📥 Possíveis respostas:
 
-2) Consultar status/resultado
-curl -X GET http://localhost:8000/results/8fcb0c4b-1b60-4d38-86bb-938b11e64a33
+🔄 Em processamento:
 
-
-Possíveis respostas
-
-Em processamento
-
-{ "task_id":"...", "status":"processing", "data":{}, "error":null }
-
-
-Concluída
-
+json
 {
-  "task_id":"...",
-  "status":"completed",
-  "data":{
-    "cnpj":"00006486000175",
-    "razao_social":"EMPRESA XYZ LTDA",
-    "inscricao_estadual":"123456789",
-    "situacao_cadastral":"HABILITADO",
-    "uf":"GO"
-  },
-  "error":null
+  "task_id": "...",
+  "status": "processing",
+  "data": {},
+  "error": null
 }
+✅ Concluída:
 
+json
+{
+  "task_id": "...",
+  "status": "completed",
+  "data": {
+    "cnpj": "00006486000175",
+    "razao_social": "EMPRESA XYZ LTDA",
+    "inscricao_estadual": "123456789",
+    "situacao_cadastral": "HABILITADO",
+    "uf": "GO"
+  },
+  "error": null
+}
+❌ Erro:
 
-Erro
-
-{ "task_id":"...", "status":"error", "data":{}, "error":"Mensagem de erro" }
-
-
-
-Todos os serviços com logs
+json
+{
+  "task_id": "...",
+  "status": "error",
+  "data": {},
+  "error": "Mensagem de erro"
+}
+📊 Monitoramento
+👀 Ver todos os serviços com logs
+bash
 docker compose logs -f
-
-Só o worker (ver consumo da fila e scraping)
+🛠️ Só o worker (ver consumo da fila e scraping)
+bash
 docker compose logs -f worker
-
-RabbitMQ (ver se está aceitando conexões)
+🐇 RabbitMQ (ver conexões)
+bash
 docker compose logs -f rabbitmq
+📈 Painel RabbitMQ
+Acesse: http://localhost:15672
 
-No painel do RabbitMQ (Queues → scraping_queue) verifique Consumers = 1 (worker conectado) e a queda do campo Ready quando o worker consome.
+Vá em Queues → scraping_queue
 
-Estrutura do projeto
+Verifique Consumers = 1 (worker conectado)
+
+Observe a queda do campo Ready quando o worker consome
+
+📁 Estrutura do Projeto
+text
 src/
-├─ app/
-│  ├─ __init__.py
-│  ├─ main.py                # FastAPI: /scrape e /results/{task_id}
-│  └─ models.py              # Pydantic models e exceptions
-├─ infrastructure/
-│  └─ clients_manager.py     # RedisClient e RabbitMQClient (publish/consume)
-└─ worker/
-   ├─ __init__.py
-   ├─ worker.py              # loop do consumidor (RabbitMQ → processa → Redis)
-   └─ scraper.py             # Playwright: consulta.asp → consultar.asp → parse
+├── 🚀 app/
+│   ├── __init__.py
+│   ├── main.py          # FastAPI: /scrape e /results/{task_id}
+│   └── models.py        # Pydantic models e exceptions
+├── 🏗️ infrastructure/
+│   └── clients_manager.py  # RedisClient e RabbitMQClient
+└── 🛠️ worker/
+    ├── __init__.py
+    ├── worker.py        # Loop do consumidor (RabbitMQ → processa → Redis)
+    └── scraper.py       # Playwright: consulta.asp → consultar.asp → parse
+🔧 Como o Worker Funciona
+🔄 Processo Técnico
+📥 Consumo: Conecta no RabbitMQ e consome a fila scraping_queue
 
-Como o Worker funciona (resumo técnico)
+🔄 Processamento: Para cada mensagem {task_id, cnpj}:
 
--Conecta no RabbitMQ e consome a fila scraping_queue.
--Para cada mensagem {task_id, cnpj}:
--marca processing no Redis;
--abre o Playwright/Chromium (headless), acessa Consulta/consulta.asp, preenche o CNPJ, clica em Consultar, espera consultar.asp;
--extrai os campos com BeautifulSoup;
--marca completed (ou error) no Redis com os dados.
+Marca processing no Redis
 
-O site pode estar lento/diferente. O worker usa esperas explícitas (Playwright wait_for_*).
-Reenvie a tarefa; se persistir, verifique seletor/URL (Consulta/consulta.asp → consultar.asp).
+Abre Playwright/Chromium (headless)
 
-Desenvolvimento (hot-reload simples)
+Acessa Consulta/consulta.asp
 
-Os serviços montam ./src:/src como volume — alterou o código, o container enxerga na hora.
-Se mudar dependências (requirements.txt) ou Dockerfiles, rebuild:
+Preenche o CNPJ, clica em "Consultar", espera consultar.asp
 
+Extrai os campos com BeautifulSoup
+
+💾 Armazenamento: Marca completed (ou error) no Redis com os dados
+
+⚠️ Considerações Importantes
+🌐 Site pode estar lento/diferente
+
+⏳ Worker usa esperas explícitas (Playwright wait_for_*)
+
+🔄 Reenvie a tarefa se necessário
+
+🔍 Verifique seletores/URLs se persistirem erros
+
+🚀 Desenvolvimento (Hot-Reload)
+🔥 Desenvolvimento com Hot-Reload
+Os serviços montam ./src:/src como volume — alterações no código são refletidas instantaneamente!
+
+📦 Rebuild para dependências
+Se mudar requirements.txt ou Dockerfiles:
+
+bash
 docker compose up -d --build
